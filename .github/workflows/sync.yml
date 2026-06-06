@@ -27,15 +27,16 @@ jobs:
           NEW=$(git status --porcelain pocs/ | grep "^??" | wc -l)
           echo "count=$NEW" >> $GITHUB_OUTPUT
           if [ "$NEW" -gt 0 ]; then
-            MSG=$(git status --porcelain pocs/ | grep "^??" | head -10 | sed 's|.*pocs/[0-9]*/||;s|\.json||' | tr '
-' ', ')
+            MSG=$(git status --porcelain pocs/ | grep "^??" | head -10 | sed 's|.*pocs/[0-9]*/||;s|\.json||' | tr '\\n' ', ')
             echo "msg=🆕 $NEW new PoC(s): $MSG" >> $GITHUB_OUTPUT
           fi
 
       - name: Send Telegram notification
         if: steps.newpocs.outputs.count > 0
         run: |
-          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage"             -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}"             -d text="${{ steps.newpocs.outputs.msg }}"
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${{ steps.newpocs.outputs.msg }}"
 
       - name: Commit and push
         run: |
