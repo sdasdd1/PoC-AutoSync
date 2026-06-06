@@ -27,7 +27,7 @@ jobs:
           NEW=$(git status --porcelain pocs/ | grep "^??" | wc -l)
           echo "count=$NEW" >> $GITHUB_OUTPUT
           if [ "$NEW" -gt 0 ]; then
-            MSG=$(git status --porcelain pocs/ | grep "^??" | head -10 | sed 's|.*pocs/[0-9]*/||;s|\.json||' | tr '\\n' ', ')
+            MSG=$(git status --porcelain pocs/ | grep "^??" | head -10 | sed 's|.*pocs/[0-9]*/||;s|\.json||' | tr '\n' ', ')
             echo "msg=🆕 $NEW new PoC(s): $MSG" >> $GITHUB_OUTPUT
           fi
 
