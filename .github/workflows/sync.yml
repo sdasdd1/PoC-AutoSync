@@ -1,0 +1,66 @@
+name: PoC Sync + Telegram
+
+on:
+  schedule:
+    - cron: "0 * * * *"
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Sync PoCs from API
+        run: |
+          mkdir -p pocs
+          for year in $(seq 1999 2026); do
+            mkdir -p "pocs/$year"
+            curl -s "https://poc-in-github.motikan2010.net/api/v1/?year=$year" | \
+            python3 -c "
+import sys, json, os
+try:
+    data = json.load(sys.stdin)
+    for poc in data.get('pocs', []):
+        cve = poc.get('cve_id', '')
+        if not cve: continue
+        year = cve.split('-')[1]
+        path = f'pocs/{year}/{cve}.json'
+        if not os.path.exists(path):
+            with open(path, 'w') as f:
+                json.dump(poc, f, indent=2)
+            print(f'NEW: {cve}')
+except: pass
+" 2>/dev/null
+          done
+
+      - name: Detect new PoCs
+        id: newpocs
+        run: |
+          NEW=$(git status --porcelain pocs/ | grep "^??" | wc -l)
+          echo "count=$NEW" >> $GITHUB_OUTPUT
+          if [ "$NEW" -gt 0 ]; then
+            MSG=$(git status --porcelain pocs/ | grep "^??" | head -10 | sed 's|.*pocs/[0-9]*/||;s|\.json||' | tr '\n' ', ')
+            echo "msg=🆕 $NEW new PoC(s): $MSG" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Send Telegram notification
+        if: steps.newpocs.outputs.count > 0
+        run: |
+          curl -s "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d text="${{ steps.newpocs.outputs.msg }}"
+
+      - name: Commit and push
+        run: |
+          git config user.name "PoC-Bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add pocs/
+          if git diff --staged --quiet; then
+            echo "No new PoCs"
+          else
+            git commit -m "sync: $(date -u +'%Y-%m-%d %H:%M')"
+            git push
+          fi
